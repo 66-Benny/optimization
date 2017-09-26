@@ -156,5 +156,61 @@ Last-Modified 说好却也不是特别好，因为如果在服务器上，一个
 【Last-Modified，If-Modified-Since】和【ETag、If-None-Match】一般都是同时启用，这是为了处理 Last-Modified 不可靠的情况.
 
 > **有一种场景需要注意：**
-> - 分布式系统里多台机器间文件的Last-Modified必须保持一致，以免负载均衡到不同机器导致比对失败；
-> - 分布式系统尽量关闭掉ETag(每台机器生成的ETag都会不一样）
+> - 分布式系统里多台机器间文件的 Last-Modified 必须保持一致，以免负载均衡到不同机器导致比对失败；
+> - 分布式系统尽量关闭掉 ETag (每台机器生成的 ETag 都会不一样）
+
+### 四. 使用 CDN
+
+网站 80-90% 响应时间消耗在资源下载上，减少资源下载时间是性能优化的黄金发则。
+
+相比分布式架构的复杂和巨大投入，静态内容分发网络（CDN）可以以较低的投入，获得加载速度有效提升。
+
+但是在实际开发中没有用到过，没法详细解释。
+
+### 五. 预加载 DNS
+
+通过 DNS 预解析来告诉浏览器未来我们可能从某个特定的 URL 获取资源，当浏览器真正使用到该域中的某个资源时就可以尽快地完成 DNS 解析。
+
+#### DNS 预解析 DNS-Prefetch
+```
+<link rel="dns-prefetch" href="//example.com">
+```
+当我们从该 URL 请求一个资源时，就不再需要等待 DNS 的解析过程。该技术对使用第三方资源特别有用。
+
+在 Harry Roberts 的[文章](https://csswizardry.com/2013/01/front-end-performance-for-web-designers-and-front-end-developers/#section:dns-prefetching)中提到：
+>  通过简单的一行代码就可以告知那些兼容的浏览器进行 DNS 预解析，这意味着当浏览器真正请求该域中的某个资源时，DNS 的解析就已经完成了。
+
+#### 预连接 Preconnect
+
+与 DNS 预解析类似，preconnect 不仅完成 DNS 预解析，同时还将进行 TCP 握手和建立传输层协议。可以这样使用：
+```
+<link rel="preconnect" href="http://example.com">
+```
+在 Ilya Grigorik 的[文章](https://www.igvita.com/2015/08/17/eliminating-roundtrips-with-preconnect/)中有更详细的介绍：
+>现代浏览器都试着预测网站将来需要哪些连接，然后预先建立 socket 连接，从而消除昂贵的 DNS 查找、TCP 握手和 TLS 往返开销。然而，浏览器还不够聪明，并不能准确预测每个网站的所有预链接目标。好在，在 Firefox 39 和 Chrome 46 中我们可以使用 preconnect 告诉浏览器我们需要进行哪些预连接。
+
+#### 预获取 Prefetching
+如果我们确定某个资源将来一定会被使用到，我们可以让浏览器预先请求该资源并放入浏览器缓存中。例如，一个图片和脚本或任何可以被浏览器缓存的资源：
+```
+<link rel="prefetch" href="image.png">
+```
+与 DNS 预解析不同，预获取真正请求并下载了资源，并储存在缓存中
+
+#### Subresources
+这是另一个预获取方式，这种方式指定的预获取资源具有最高的优先级，在所有 prefetch 项之前进行：
+```
+<link rel="subresource" href="styles.css">
+```
+根据 Chrome 文档：
+> rel=prefetch 为将来的页面提供了一种低优先级的资源预加载方式，而 rel=subresource 为当前页面提供了一种高优先级的资源预加载。
+所以，如果资源是当前页面必须的，或者资源需要尽快可用，那么最好使用 subresource 而不是 prefetch。
+
+#### 预渲染 Prerender
+
+这是一个核武器，因为 prerender 可以预先加载文档的所有资源：
+```
+<link rel="prerender" href="http://example.com">
+```
+> 这类似于在一个隐藏的 tab 页中打开了某个链接 – 将下载所有资源、创建 DOM 结构、完成页面布局、应用 CSS 样式和执行 JavaScript 脚本等。当用户真正访问该链接时，隐藏的页面就切换为可见，使页面看起来就是瞬间加载完成一样。Google 搜索在其即时搜索页面中已经应用该技术多年了，微软也宣称将在 IE11 中支持该特性
+
+需要注意的是不要滥用该特性，当你知道用户一定会点击某个链接时才可以进行预渲染，否则浏览器将无条件地下载所有预渲染需要的资源。
